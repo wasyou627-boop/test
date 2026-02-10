@@ -3,155 +3,95 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Canvas ブロック崩し</title>
+  <title>超簡単ブロック崩し</title>
   <style>
     body {
       margin: 0;
       min-height: 100vh;
       display: grid;
       place-items: center;
-      background: #101010;
-      color: #ffffff;
+      background: #111;
+      color: #fff;
       font-family: system-ui, -apple-system, sans-serif;
     }
 
-    .container {
+    .game-wrap {
       text-align: center;
     }
 
     canvas {
+      border: 2px solid #fff;
+      background: #1d1d1d;
       display: block;
-      margin: 10px auto;
-      border: 2px solid #ffffff;
-      background: #1a1a1a;
+      margin: 12px auto;
     }
 
-    .help {
-      margin: 0;
+    .hint {
       font-size: 14px;
-      opacity: 0.92;
+      opacity: 0.9;
     }
   </style>
 </head>
 <body>
-  <main class="container">
+  <div class="game-wrap">
     <h1>超簡単ブロック崩し</h1>
-    <canvas id="game" width="900" height="600"></canvas>
-    <p class="help">←→：移動 / SPACE：開始・再挑戦</p>
-  </main>
+    <p class="hint">← → キーでパドルを動かす</p>
+    <canvas id="game" width="640" height="420"></canvas>
+  </div>
 
   <script>
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
 
-    const STATE = {
-      WAIT: 'WAIT',
-      PLAYING: 'PLAYING',
-      GAMEOVER: 'GAMEOVER',
-      CLEAR: 'CLEAR',
-    };
-
     const paddle = {
-      width: 150,
-      height: 16,
-      x: 0,
-      y: canvas.height - 38,
-      speed: 8,
+      width: 110,
+      height: 14,
+      x: (canvas.width - 110) / 2,
+      y: canvas.height - 28,
+      speed: 7,
       moveLeft: false,
       moveRight: false,
     };
 
     const ball = {
-      x: 0,
-      y: 0,
-      radius: 9,
-      vx: 1.5,
-      vy: -1.5,
+      x: canvas.width / 2,
+      y: canvas.height - 45,
+      r: 8,
+      dx: 3,
+      dy: -3,
     };
 
-    const board = {
-      cols: 10,
-      rows: 6,
-      brickW: 74,
-      brickH: 22,
-      gap: 12,
-      offsetX: 43,
-      offsetY: 70,
+    const brick = {
+      rowCount: 5,
+      colCount: 8,
+      width: 68,
+      height: 20,
+      padding: 10,
+      offsetTop: 46,
+      offsetLeft: 21,
     };
 
-    let gameState = STATE.WAIT;
-    let score = 0;
-    const maxScore = board.cols * board.rows;
     const bricks = [];
-
-    function rebuildBricks() {
-      bricks.length = 0;
-      for (let c = 0; c < board.cols; c++) {
-        bricks[c] = [];
-        for (let r = 0; r < board.rows; r++) {
-          bricks[c][r] = { x: 0, y: 0, alive: true };
-        }
+    for (let c = 0; c < brick.colCount; c++) {
+      bricks[c] = [];
+      for (let r = 0; r < brick.rowCount; r++) {
+        bricks[c][r] = { x: 0, y: 0, alive: true };
       }
     }
 
-    function resetRound() {
-      paddle.x = (canvas.width - paddle.width) / 2;
-      paddle.moveLeft = false;
-      paddle.moveRight = false;
+    let gameState = 'playing'; // playing | gameover | clear
+    let score = 0;
+    const totalBricks = brick.rowCount * brick.colCount;
 
-      ball.x = canvas.width / 2;
-      ball.y = paddle.y - 20;
-      ball.vx = (Math.random() < 0.5 ? -1 : 1) * 1.5;
-      ball.vy = -1.5;
-
-      score = 0;
-      rebuildBricks();
-      gameState = STATE.WAIT;
-    }
-
-    function startOrRetry() {
-      if (gameState === STATE.WAIT) {
-        gameState = STATE.PLAYING;
-        return;
-      }
-
-      if (gameState === STATE.GAMEOVER || gameState === STATE.CLEAR) {
-        resetRound();
-        gameState = STATE.PLAYING;
-      }
-    }
-
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'ArrowLeft') paddle.moveLeft = true;
-      if (event.key === 'ArrowRight') paddle.moveRight = true;
-
-      if (event.code === 'Space') {
-        event.preventDefault();
-        startOrRetry();
-      }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') paddle.moveLeft = true;
+      if (e.key === 'ArrowRight') paddle.moveRight = true;
     });
 
-    document.addEventListener('keyup', (event) => {
-      if (event.key === 'ArrowLeft') paddle.moveLeft = false;
-      if (event.key === 'ArrowRight') paddle.moveRight = false;
+    document.addEventListener('keyup', (e) => {
+      if (e.key === 'ArrowLeft') paddle.moveLeft = false;
+      if (e.key === 'ArrowRight') paddle.moveRight = false;
     });
-
-    function drawBricks() {
-      for (let c = 0; c < board.cols; c++) {
-        for (let r = 0; r < board.rows; r++) {
-          const brick = bricks[c][r];
-          if (!brick.alive) continue;
-
-          const x = board.offsetX + c * (board.brickW + board.gap);
-          const y = board.offsetY + r * (board.brickH + board.gap);
-          brick.x = x;
-          brick.y = y;
-
-          ctx.fillStyle = '#f25f5c';
-          ctx.fillRect(x, y, board.brickW, board.brickH);
-        }
-      }
-    }
 
     function drawPaddle() {
       ctx.fillStyle = '#66d9ff';
@@ -160,38 +100,44 @@
 
     function drawBall() {
       ctx.beginPath();
-      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
       ctx.fillStyle = '#ffd166';
       ctx.fill();
       ctx.closePath();
     }
 
-    function drawMessages() {
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '20px sans-serif';
-      ctx.fillText(`スコア: ${score} / ${maxScore}`, 18, 34);
+    function drawBricks() {
+      for (let c = 0; c < brick.colCount; c++) {
+        for (let r = 0; r < brick.rowCount; r++) {
+          const b = bricks[c][r];
+          if (!b.alive) continue;
 
-      if (gameState === STATE.WAIT) {
+          const brickX = c * (brick.width + brick.padding) + brick.offsetLeft;
+          const brickY = r * (brick.height + brick.padding) + brick.offsetTop;
+          b.x = brickX;
+          b.y = brickY;
+
+          ctx.fillStyle = '#f25f5c';
+          ctx.fillRect(brickX, brickY, brick.width, brick.height);
+        }
+      }
+    }
+
+    function drawText() {
+      ctx.fillStyle = '#fff';
+      ctx.font = '18px sans-serif';
+      ctx.fillText(`スコア: ${score} / ${totalBricks}`, 14, 28);
+
+      if (gameState === 'gameover') {
         ctx.font = 'bold 42px sans-serif';
-        ctx.fillText('SPACEでスタート', canvas.width / 2 - 180, canvas.height / 2);
-      }
-
-      if (gameState === STATE.GAMEOVER) {
-        ctx.font = 'bold 52px sans-serif';
         ctx.fillStyle = '#ff6b6b';
-        ctx.fillText('GAME OVER', canvas.width / 2 - 170, canvas.height / 2 - 10);
-        ctx.font = 'bold 30px sans-serif';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText('SPACEで再挑戦', canvas.width / 2 - 130, canvas.height / 2 + 45);
+        ctx.fillText('GAME OVER', canvas.width / 2 - 145, canvas.height / 2);
       }
 
-      if (gameState === STATE.CLEAR) {
-        ctx.font = 'bold 56px sans-serif';
+      if (gameState === 'clear') {
+        ctx.font = 'bold 44px sans-serif';
         ctx.fillStyle = '#80ed99';
-        ctx.fillText('CLEAR!', canvas.width / 2 - 120, canvas.height / 2 - 10);
-        ctx.font = 'bold 30px sans-serif';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText('SPACEで再挑戦', canvas.width / 2 - 130, canvas.height / 2 + 45);
+        ctx.fillText('CLEAR!', canvas.width / 2 - 90, canvas.height / 2);
       }
     }
 
@@ -205,51 +151,47 @@
       }
     }
 
-    function bounceWallsAndPaddle() {
-      if (ball.x + ball.vx < ball.radius || ball.x + ball.vx > canvas.width - ball.radius) {
-        ball.vx = -ball.vx;
+    function bounceFromWallsAndPaddle() {
+      if (ball.x + ball.dx > canvas.width - ball.r || ball.x + ball.dx < ball.r) {
+        ball.dx = -ball.dx;
       }
 
-      if (ball.y + ball.vy < ball.radius) {
-        ball.vy = -ball.vy;
+      if (ball.y + ball.dy < ball.r) {
+        ball.dy = -ball.dy;
       }
 
-      const onPaddle =
-        ball.y + ball.radius >= paddle.y &&
-        ball.y + ball.radius <= paddle.y + paddle.height &&
-        ball.x >= paddle.x &&
-        ball.x <= paddle.x + paddle.width;
-
-      if (onPaddle) {
-        const center = paddle.x + paddle.width / 2;
-        const ratio = (ball.x - center) / (paddle.width / 2);
-        ball.vx = ratio * 2.2;
-        ball.vy = -Math.abs(ball.vy);
+      if (
+        ball.y + ball.r >= paddle.y &&
+        ball.y + ball.r <= paddle.y + paddle.height &&
+        ball.x > paddle.x &&
+        ball.x < paddle.x + paddle.width
+      ) {
+        ball.dy = -Math.abs(ball.dy);
       }
 
-      if (ball.y + ball.vy > canvas.height - ball.radius) {
-        gameState = STATE.GAMEOVER;
+      if (ball.y + ball.dy > canvas.height - ball.r) {
+        gameState = 'gameover';
       }
     }
 
-    function hitBricks() {
-      for (let c = 0; c < board.cols; c++) {
-        for (let r = 0; r < board.rows; r++) {
-          const brick = bricks[c][r];
-          if (!brick.alive) continue;
+    function brickCollision() {
+      for (let c = 0; c < brick.colCount; c++) {
+        for (let r = 0; r < brick.rowCount; r++) {
+          const b = bricks[c][r];
+          if (!b.alive) continue;
 
-          const hit =
-            ball.x > brick.x &&
-            ball.x < brick.x + board.brickW &&
-            ball.y > brick.y &&
-            ball.y < brick.y + board.brickH;
+          if (
+            ball.x > b.x &&
+            ball.x < b.x + brick.width &&
+            ball.y > b.y &&
+            ball.y < b.y + brick.height
+          ) {
+            b.alive = false;
+            ball.dy = -ball.dy;
+            score++;
 
-          if (hit) {
-            brick.alive = false;
-            ball.vy = -ball.vy;
-            score += 1;
-            if (score === maxScore) {
-              gameState = STATE.CLEAR;
+            if (score === totalBricks) {
+              gameState = 'clear';
             }
           }
         }
@@ -257,29 +199,28 @@
     }
 
     function moveBall() {
-      ball.x += ball.vx;
-      ball.y += ball.vy;
+      ball.x += ball.dx;
+      ball.y += ball.dy;
     }
 
-    function loop() {
+    function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawBricks();
       drawPaddle();
       drawBall();
-      drawMessages();
+      drawText();
 
-      if (gameState === STATE.PLAYING) {
-        updatePaddle();
-        bounceWallsAndPaddle();
-        hitBricks();
-        moveBall();
-      }
+      if (gameState !== 'playing') return;
 
-      requestAnimationFrame(loop);
+      updatePaddle();
+      bounceFromWallsAndPaddle();
+      brickCollision();
+      moveBall();
+
+      requestAnimationFrame(draw);
     }
 
-    resetRound();
-    loop();
+    draw();
   </script>
 </body>
 </html>
